@@ -5,6 +5,7 @@ from http import HTTPStatus
 
 import requests
 import dashscope
+import google.generativeai as genai
 
 from utils import print_with_color, encode_image
 
@@ -96,6 +97,33 @@ class QwenModel(BaseModel):
             return True, response.output.choices[0].message.content[0]["text"]
         else:
             return False, response.message
+
+
+class GeminiModel(BaseModel):
+    def __init__(self, api_key: str, model: str, temperature: float, max_tokens: int):
+        super().__init__()
+        genai.configure(api_key=api_key)
+        self.model = genai.GenerativeModel(model)
+        self.generation_config = {
+            "temperature": temperature,
+            "max_output_tokens": max_tokens,
+        }
+
+    def get_model_response(self, prompt: str, images: List[str]) -> (bool, str):
+        try:
+            content = [prompt]
+            for img_path in images:
+                with open(img_path, "rb") as f:
+                    img_data = f.read()
+                content.append({
+                    "mime_type": "image/jpeg",
+                    "data": img_data
+                })
+
+            response = self.model.generate_content(content, generation_config=self.generation_config)
+            return True, response.text
+        except Exception as e:
+            return False, str(e)
 
 
 def parse_explore_rsp(rsp):

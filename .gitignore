@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.DS_Store
+*.png
+*.xml
+*.txt
+tasks/
+apps/*/demos/
+apps/*/auto_docs/
+apps/*/demo_docs/
