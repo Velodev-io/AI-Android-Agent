@@ -116,13 +116,14 @@ class GeminiModel(BaseModel):
                 with open(img_path, "rb") as f:
                     img_data = f.read()
                 content.append({
-                    "mime_type": "image/jpeg",
+                    "mime_type": "image/png",
                     "data": img_data
                 })
 
             response = self.model.generate_content(content, generation_config=self.generation_config)
             return True, response.text
         except Exception as e:
+            print_with_color(f"Gemini Error: {e}", "red")
             return False, str(e)
 
 

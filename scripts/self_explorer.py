@@ -257,7 +257,7 @@ while round_count < configs["MAX_ROUNDS"]:
             print_with_color(f"ERROR: Undefined decision! {decision}", "red")
             break
     else:
-        print_with_color(rsp["error"]["message"], "red")
+        print_with_color(rsp, "red")
         break
     time.sleep(configs["REQUEST_INTERVAL"])
 
