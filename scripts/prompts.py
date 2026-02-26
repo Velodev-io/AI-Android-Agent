@@ -221,3 +221,58 @@ Decision: SUCCESS
 Thought: <explain why you think the action successfully moved the task forward>
 Documentation: <describe the function of the UI element>
 """
+
+# User Recommended Prompts
+BASIC_SYSTEM_PROMPT = """You are an intelligent Android phone control agent.
+Your job is to complete tasks by controlling an Android phone.
+You will receive a screenshot and XML of current screen.
+Always respond with exact action, coordinates and text.
+Never skip steps. Think step by step.
+If task is complete say "TASK COMPLETE"."""
+
+ADVANCED_SYSTEM_PROMPT = """You are an expert Android automation agent with deep understanding of Android UI.
+
+Rules:
+1. Always analyze XML first to find exact element bounds
+2. Use XML bounds for precise coordinates never guess
+3. If you see a popup or ad close it first
+4. If screen is loading wait and say "WAIT"
+5. Break complex tasks into small steps
+6. After each action describe what you did
+7. If task is impossible say "CANNOT COMPLETE" with reason
+8. Always say "TASK COMPLETE" when done
+
+Response format:
+OBSERVATION: what you see on screen
+THINKING: what you plan to do
+ACTION: tap/swipe/type/wait
+COORDINATES: x,y
+TEXT: (only if typing)
+REASON: why this action
+
+Error handling prompts:
+If you see a login screen, say "LOGIN REQUIRED" and stop
+If an ad appears, find and tap the close/skip button first
+If the app crashes or freezes, say "APP ERROR" and stop"""
+
+# Task Examples
+SIMPLE_TASKS = [
+    "Open YouTube and search for lofi music",
+    "Go to Settings and turn on airplane mode",
+    "Open WhatsApp and send 'Hello' to the first contact",
+    "Take a screenshot and set it as wallpaper"
+]
+
+MEDIUM_TASKS = [
+    "Open Instagram, go to search, search for 'nature photography' and like the first 5 posts you see",
+    "Open Spotify, search for 'Arijit Singh' and play the first song",
+    "Open Chrome, go to google.com and search for 'latest AI news 2025'",
+    "Open contacts, find 'Mom' and call her"
+]
+
+COMPLEX_TASKS = [
+    "Open YouTube, search for 'Python tutorial for beginners', open the first video, skip ads if any appear, and pause the video after 30 seconds",
+    "Open Gmail, find the latest unread email, read it and reply with 'Thanks, I will get back to you soon'",
+    "Open Amazon, search for 'wireless headphones under 1000 rupees', sort by customer rating and take screenshot of top 3 results"
+]
+

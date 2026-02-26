@@ -126,6 +126,24 @@ class GeminiModel(BaseModel):
             print_with_color(f"Gemini Error: {e}", "red")
             return False, str(e)
 
+    def ask_gemini(self, task: str, screenshot_path: str, xml_content: str) -> str:
+        from prompts import ADVANCED_SYSTEM_PROMPT
+        
+        system_prompt = ADVANCED_SYSTEM_PROMPT
+        
+        full_prompt = f"""
+        {system_prompt}
+        
+        Current task: {task}
+        XML Structure: {xml_content}
+        """
+        
+        status, response = self.get_model_response(full_prompt, [screenshot_path])
+        if status:
+            return response
+        else:
+            return f"ERROR: {response}"
+
 
 def parse_explore_rsp(rsp):
     try:
@@ -236,5 +254,47 @@ def parse_reflect_rsp(rsp):
             return ["ERROR"]
     except Exception as e:
         print_with_color(f"ERROR: an exception occurs while parsing the model response: {e}", "red")
+        print_with_color(rsp, "red")
+        return ["ERROR"]
+
+
+def parse_expert_rsp(rsp):
+    try:
+        observation = re.findall(r"OBSERVATION: (.*?)$", rsp, re.MULTILINE | re.IGNORECASE)[0]
+        thinking = re.findall(r"THINKING: (.*?)$", rsp, re.MULTILINE | re.IGNORECASE)[0]
+        action = re.findall(r"ACTION: (.*?)$", rsp, re.MULTILINE | re.IGNORECASE)[0]
+        
+        print_with_color("OBSERVATION:", "yellow")
+        print_with_color(observation, "magenta")
+        print_with_color("THINKING:", "yellow")
+        print_with_color(thinking, "magenta")
+        print_with_color("ACTION:", "yellow")
+        print_with_color(action, "magenta")
+
+        if "TASK COMPLETE" in rsp.upper():
+            return ["FINISH"]
+        
+        act_name = action.strip().lower()
+        if act_name in ["tap", "type", "swipe", "wait"]:
+            coords = re.findall(r"COORDINATES: (.*?)$", rsp, re.MULTILINE | re.IGNORECASE)
+            text = re.findall(r"TEXT: (.*?)$", rsp, re.MULTILINE | re.IGNORECASE)
+            
+            res = [act_name]
+            if coords:
+                res.append(coords[0].strip())
+            if text:
+                res.append(text[0].strip())
+            
+            reason = re.findall(r"REASON: (.*?)$", rsp, re.MULTILINE | re.IGNORECASE)
+            if reason:
+                print_with_color("REASON:", "yellow")
+                print_with_color(reason[0], "magenta")
+                
+            return res
+        else:
+            print_with_color(f"ERROR: Undefined act {act_name}!", "red")
+            return ["ERROR"]
+    except Exception as e:
+        print_with_color(f"ERROR: an exception occurs while parsing the expert model response: {e}", "red")
         print_with_color(rsp, "red")
         return ["ERROR"]

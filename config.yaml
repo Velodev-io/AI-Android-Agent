@@ -10,8 +10,8 @@ REQUEST_INTERVAL: 10  # Time in seconds between consecutive GPT-4V requests
 DASHSCOPE_API_KEY: "sk-"  # The dashscope API key that gives you access to Qwen-VL model
 QWEN_MODEL: "qwen-vl-max"
 
-GEMINI_API_KEY: "AIzaSyBvv1qNnISg-dgDL4nFDTqenKn2AVnUtNU"
-GEMINI_MODEL: "gemini-flash-latest"
+GEMINI_API_KEY: "AIzaSyCLXIEz1mqoz0smJhWvA2w8fDOECUXhbOo"
+GEMINI_MODEL: "gemini-2.0-flash"
 
 ANDROID_SCREENSHOT_DIR: "/sdcard"  # Set the directory on your Android device to store the intermediate screenshots. Make sure the directory EXISTS on your phone!
 ANDROID_XML_DIR: "/sdcard"  # Set the directory on your Android device to store the intermediate XML files used for determining locations of UI elements on your screen. Make sure the directory EXISTS on your phone!
