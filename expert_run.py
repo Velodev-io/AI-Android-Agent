@@ -61,6 +61,7 @@ def main():
     os.mkdir(task_dir)
 
     round_count = 0
+    last_act = "None"
     while round_count < configs["MAX_ROUNDS"]:
         round_count += 1
         print_with_color(f"--- Round {round_count} ---", "yellow")
@@ -76,7 +77,7 @@ def main():
             xml_content = f.read()
 
         print_with_color("Analysing screen with Expert Gemini...", "yellow")
-        rsp = mllm.ask_gemini(task_desc, screenshot_path, xml_content)
+        rsp = mllm.ask_gemini(task_desc, screenshot_path, xml_content, last_act)
         
         if rsp.startswith("ERROR:"):
             print_with_color(rsp, "red")
@@ -94,22 +95,33 @@ def main():
             
         if act_name == "tap":
             try:
-                coords = res[1].split(',')
-                x, y = int(coords[0]), int(coords[1])
+                coords_str = res[1].replace("(", "").replace(")", "").strip()
+                coords = coords_str.split(',')
+                x, y = int(coords[0].strip()), int(coords[1].strip())
                 controller.tap(x, y)
-            except:
-                print_with_color("Invalid coordinates for tap", "red")
+                last_act = f"Tapped at ({x}, {y})"
+            except Exception as e:
+                print_with_color(f"Invalid coordinates for tap: {res[1]} - {e}", "red")
         elif act_name == "type":
             try:
                 text = res[2] if len(res) > 2 else ""
                 controller.text(text)
-            except:
-                print_with_color("Failed to enter text", "red")
+                last_act = f"Typed text: {text}"
+            except Exception as e:
+                print_with_color(f"Failed to enter text: {e}", "red")
         elif act_name == "swipe":
-            # Simplistic swipe from coords for now
-            print_with_color("Swipe not fully implemented in expert mode yet", "red")
+            try:
+                # Handle swipe coordinates if provided
+                coords_str = res[1].replace("(", "").replace(")", "").strip()
+                # res[1] might be "start_x,start_y,end_x,end_y" or similar
+                # For now, let's just log and try a standard swipe if direction is hinted
+                last_act = f"Performed swipe action with info: {coords_str}"
+                print_with_color("Swipe not fully implemented in expert mode yet", "red")
+            except:
+                print_with_color("Failed to perform swipe", "red")
         elif act_name == "wait":
             time.sleep(5)
+            last_act = "Waited for 5 seconds"
             
         time.sleep(configs["REQUEST_INTERVAL"])
 

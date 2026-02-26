@@ -108,6 +108,12 @@ class GeminiModel(BaseModel):
             "temperature": temperature,
             "max_output_tokens": max_tokens,
         }
+        self.safety_settings = [
+            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+        ]
 
     def get_model_response(self, prompt: str, images: List[str]) -> (bool, str):
         try:
@@ -120,23 +126,39 @@ class GeminiModel(BaseModel):
                     "data": img_data
                 })
 
-            response = self.model.generate_content(content, generation_config=self.generation_config)
-            return True, response.text
+            response = self.model.generate_content(content, generation_config=self.generation_config, safety_settings=self.safety_settings)
+            if response.candidates:
+                return True, response.text
+            else:
+                return False, "Gemini blocked the response or returned no candidates."
         except Exception as e:
             print_with_color(f"Gemini Error: {e}", "red")
             return False, str(e)
 
-    def ask_gemini(self, task: str, screenshot_path: str, xml_content: str) -> str:
+    def ask_gemini(self, task: str, screenshot_path: str, xml_content: str, last_act: str = "None") -> str:
         from prompts import ADVANCED_SYSTEM_PROMPT
         
         system_prompt = ADVANCED_SYSTEM_PROMPT
         
-        full_prompt = f"""
-        {system_prompt}
-        
-        Current task: {task}
-        XML Structure: {xml_content}
-        """
+        # Limit XML size if it's too large to prevent overwhelming the model
+        if len(xml_content) > 50000:
+            xml_content = xml_content[:50000] + "\n... (XML truncated for brevity) ..."
+
+        full_prompt = f"""{system_prompt}
+
+TASK CONTEXT:
+Target App Task: {task}
+Previous Action: {last_act}
+
+SCREEN XML STRUCTURE:
+<xml>
+{xml_content}
+</xml>
+
+IMPORTANT: You must follow the 'Response format' exactly. Provide all fields: OBSERVATION, THINKING, ACTION, COORDINATES, and REASON. If typing, also provide TEXT.
+If the task is complete, ensure you say "TASK COMPLETE" in your response.
+
+Please proceed with the next step."""
         
         status, response = self.get_model_response(full_prompt, [screenshot_path])
         if status:
@@ -260,41 +282,74 @@ def parse_reflect_rsp(rsp):
 
 def parse_expert_rsp(rsp):
     try:
-        observation = re.findall(r"OBSERVATION: (.*?)$", rsp, re.MULTILINE | re.IGNORECASE)[0]
-        thinking = re.findall(r"THINKING: (.*?)$", rsp, re.MULTILINE | re.IGNORECASE)[0]
-        action = re.findall(r"ACTION: (.*?)$", rsp, re.MULTILINE | re.IGNORECASE)[0]
-        
-        print_with_color("OBSERVATION:", "yellow")
-        print_with_color(observation, "magenta")
-        print_with_color("THINKING:", "yellow")
-        print_with_color(thinking, "magenta")
-        print_with_color("ACTION:", "yellow")
-        print_with_color(action, "magenta")
+        # Improved regex to be more flexible with whitespace and colon
+        def get_field(field_name):
+            pattern = rf"{field_name}:\s*(.*?)(?=\n[A-Z]+:|$)"
+            match = re.search(pattern, rsp, re.DOTALL | re.IGNORECASE)
+            return match.group(1).strip() if match else None
 
-        if "TASK COMPLETE" in rsp.upper():
+        observation = get_field("OBSERVATION")
+        thinking = get_field("THINKING")
+        action = get_field("ACTION")
+        
+        if observation:
+            print_with_color("OBSERVATION:", "yellow")
+            print_with_color(observation, "magenta")
+        if thinking:
+            print_with_color("THINKING:", "yellow")
+            print_with_color(thinking, "magenta")
+        if action:
+            print_with_color("ACTION:", "yellow")
+            print_with_color(action, "magenta")
+
+        if not action:
+            if "TASK COMPLETE" in rsp.upper():
+                return ["FINISH"]
+            print_with_color("ERROR: Could not find ACTION in response.", "red")
+            print_with_color("Full Response for debugging:", "yellow")
+            print(rsp)
+            return ["ERROR"]
+
+        act_name = action.lower()
+        if "finish" in act_name:
             return ["FINISH"]
         
-        act_name = action.strip().lower()
-        if act_name in ["tap", "type", "swipe", "wait"]:
-            coords = re.findall(r"COORDINATES: (.*?)$", rsp, re.MULTILINE | re.IGNORECASE)
-            text = re.findall(r"TEXT: (.*?)$", rsp, re.MULTILINE | re.IGNORECASE)
-            
-            res = [act_name]
-            if coords:
-                res.append(coords[0].strip())
-            if text:
-                res.append(text[0].strip())
-            
-            reason = re.findall(r"REASON: (.*?)$", rsp, re.MULTILINE | re.IGNORECASE)
-            if reason:
-                print_with_color("REASON:", "yellow")
-                print_with_color(reason[0], "magenta")
-                
-            return res
+        # Clean up action name from possible extra text
+        for potential_act in ["tap", "type", "swipe", "wait"]:
+            if potential_act in act_name:
+                act_name = potential_act
+                break
+
+        res = [act_name]
+        
+        coords = get_field("COORDINATES")
+        text = get_field("TEXT")
+        reason = get_field("REASON")
+
+        if coords:
+            res.append(coords)
+        elif act_name in ["tap", "swipe"]:
+            # Try to find something that looks like coords in the whole response
+            alt_coords = re.search(r"(\d+),\s*(\d+)", rsp)
+            if alt_coords:
+                res.append(f"{alt_coords.group(1)},{alt_coords.group(2)}")
+            else:
+                res.append(None)
         else:
-            print_with_color(f"ERROR: Undefined act {act_name}!", "red")
-            return ["ERROR"]
+            res.append(None)
+
+        if text:
+            res.append(text)
+        else:
+            res.append("")
+
+        if reason:
+            print_with_color("REASON:", "yellow")
+            print_with_color(reason, "magenta")
+            
+        return res
     except Exception as e:
         print_with_color(f"ERROR: an exception occurs while parsing the expert model response: {e}", "red")
+        print_with_color("Raw Response:", "yellow")
         print_with_color(rsp, "red")
         return ["ERROR"]
