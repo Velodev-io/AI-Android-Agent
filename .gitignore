@@ -9,3 +9,4 @@ tasks/
 apps/*/demos/
 apps/*/auto_docs/
 apps/*/demo_docs/
+config.yaml
